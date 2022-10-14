@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+
+import os
+import datetime as dt
+import json
+import subprocess
+import sys
+
+from dateutil import parser
+from dateutil import tz
+
+
+def get_end_time_of_last_interval():
+    output = subprocess.run(["timew", "export", "today"], capture_output=True)
+    data = json.loads(output.stdout.decode())
+    last_interval = [i for i in data if i["id"] == 1][0]
+
+    end_time_str = last_interval["end"]
+
+    end_time = parser.isoparse(end_time_str)
+
+    # convert to local time zone and return
+    return end_time.astimezone(tz.tzlocal())
+
+
+# Get the end time of the last interval
+end_time_of_last_interval = get_end_time_of_last_interval()
+
+# Set the start time to a minute later
+start_time = end_time_of_last_interval + dt.timedelta(seconds=1)
+
+# Set the end time to now minus one second
+end_time = dt.datetime.now() - dt.timedelta(seconds=1)
+
+# Build the command
+tags_str = " ".join(sys.argv[1:])
+format = "%Y-%m-%dT%H:%M:%S"
+cmd = f"timew track {start_time.strftime(format)} - {end_time.strftime(format)} {tags_str}"
+print(cmd)
+
+# Run the command
+os.system(cmd)
