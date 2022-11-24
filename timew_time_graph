@@ -1,0 +1,192 @@
+#!/usr/bin/python3
+
+
+import datetime as dt
+import json
+import subprocess
+import argparse
+
+from typing import TypedDict
+
+
+class Options(TypedDict):
+    tags: str
+    period: str
+    startdate: dt.datetime
+    enddate: dt.datetime
+
+
+class RawInterval(TypedDict):
+    id: int
+    start: str
+    end: str
+    tags: list[str]
+
+
+class Interval(TypedDict):
+    id: int
+    start: dt.datetime
+    end: dt.datetime
+    tags: list[str]
+    duration: int
+
+
+def get_options() -> Options:
+    """
+    Parse command line args and get options
+    """
+    parser = argparse.ArgumentParser(description="Find out when work took place")
+
+    parser.add_argument(
+        "--tags", type=str, nargs="+", help="tags of intervals", required=True
+    )
+    parser.add_argument(
+        "--range", type=str, nargs="+", help="A timewarrior date range", required=True
+    )
+    parser.add_argument("--period", choices=["day", "month", "year"], required=True)
+
+    args = parser.parse_args()
+
+    rawstartdate = dt.datetime.fromisoformat(args.range[0])
+    rawenddate = dt.datetime.fromisoformat(args.range[2])
+
+    match args.period:
+        case "day":
+            startdate = rawstartdate
+            enddate = rawenddate
+
+        case "month":
+            startdate = rawstartdate
+            startdate = rawstartdate.replace(day=1)
+
+            enddate = rawenddate
+            try:
+                enddate = rawenddate.replace(day=31)
+            except ValueError:
+                try:
+                    enddate = rawenddate.replace(day=30)
+                except ValueError:
+                    try:
+                        enddate = rawenddate.replace(day=29)
+                    except ValueError:
+                        try:
+                            enddate = rawenddate.replace(day=28)
+                        except ValueError:
+                            raise
+        case "year":
+
+            startdate = rawstartdate.replace(month=1, day=1)
+            enddate = rawenddate.replace(month=12, day=31)
+
+        case _:
+            startdate = rawstartdate
+            enddate = rawenddate
+            pass
+
+    return {
+        "tags": " ".join(args.tags),
+        # "daterange": " ".join(args.range),
+        "period": args.period,
+        "startdate": startdate,
+        "enddate": enddate,
+    }
+
+
+def convert_intervals(intervals: list[RawInterval]) -> list[Interval]:
+    result: list[Interval] = []
+    for interval in intervals:
+        starttime = dt.datetime.strptime(interval["start"], "%Y%m%dT%H%M%SZ")
+        endtime = dt.datetime.strptime(interval["end"], "%Y%m%dT%H%M%SZ")
+        duration = (endtime - starttime).seconds
+        result.append(
+            {
+                "id": interval["id"],
+                "start": starttime,
+                "end": endtime,
+                "tags": interval["tags"],
+                "duration": duration,
+            }
+        )
+    return result
+
+
+def get_timew_data(options: Options):
+    """Given the cli options return that timew data as a list of intervals"""
+
+    daterange = f"{options['startdate'].isoformat()[:10]} - {options['enddate'].isoformat()[:10]}"
+    cmd = f"timew export {daterange} {options['tags']}"
+    output = subprocess.run(cmd.split(" "), capture_output=True)
+    return convert_intervals(json.loads(output.stdout.decode()))
+
+
+def get_first_day_of_next_month(day: dt.datetime) -> dt.datetime:
+    return (day.replace(day=1) + dt.timedelta(days=32)).replace(day=1)
+
+
+def get_first_day_of_next_year(day: dt.datetime) -> dt.datetime:
+    return (day.replace(day=1, month=1) + dt.timedelta(days=367)).replace(
+        day=1, month=1
+    )
+
+
+def get_next_day(day: dt.datetime) -> dt.datetime:
+    return day + dt.timedelta(days=1)
+
+
+def get_periods(options: Options):
+
+    result: list[tuple[dt.datetime, dt.datetime]] = []
+
+    match options["period"]:
+        case "month":
+            get_first_day_of_next_period = get_first_day_of_next_month
+
+        case "year":
+            get_first_day_of_next_period = get_first_day_of_next_year
+        case "day":
+            get_first_day_of_next_period = get_next_day
+
+        case _:
+            get_first_day_of_next_period = get_next_day
+
+    periodstart = options["startdate"]
+    periodend = get_first_day_of_next_period(options["startdate"])
+
+    while periodstart < options["enddate"]:
+        pair = (periodstart, periodend)
+        result.append(pair)
+
+        periodstart = get_first_day_of_next_period(periodstart)
+        periodend = get_first_day_of_next_period(periodend)
+
+    return result
+
+
+def get_time_worked_in_period(
+    periodstart: dt.datetime, periodend: dt.datetime, intervals: list[Interval]
+) -> int:
+    result = 0
+    for interval in intervals:
+        if interval["start"] >= periodstart and interval["start"] <= periodend:
+            result += interval["duration"]
+    return result
+
+
+options = get_options()
+
+intervals = get_timew_data(options)
+
+periods = get_periods(options)
+
+
+print("start,end,hours")
+for (periodstart, periodend) in periods:
+    seconds_worked = get_time_worked_in_period(periodstart, periodend, intervals)
+    hours_worked = int((seconds_worked / 3600) * 100) / 100
+
+    reportline = (
+        f"{periodstart.isoformat()[:10]},{periodend.isoformat()[:10]},{hours_worked}"
+    )
+    print(reportline)
+
+exit()
