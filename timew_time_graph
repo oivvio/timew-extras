@@ -95,18 +95,22 @@ def get_options() -> Options:
 def convert_intervals(intervals: list[RawInterval]) -> list[Interval]:
     result: list[Interval] = []
     for interval in intervals:
-        starttime = dt.datetime.strptime(interval["start"], "%Y%m%dT%H%M%SZ")
-        endtime = dt.datetime.strptime(interval["end"], "%Y%m%dT%H%M%SZ")
-        duration = (endtime - starttime).seconds
-        result.append(
-            {
-                "id": interval["id"],
-                "start": starttime,
-                "end": endtime,
-                "tags": interval["tags"],
-                "duration": duration,
-            }
-        )
+        try:
+            starttime = dt.datetime.strptime(interval["start"], "%Y%m%dT%H%M%SZ")
+            endtime = dt.datetime.strptime(interval["end"], "%Y%m%dT%H%M%SZ")
+            duration = (endtime - starttime).seconds
+            result.append(
+                {
+                    "id": interval["id"],
+                    "start": starttime,
+                    "end": endtime,
+                    "tags": interval["tags"],
+                    "duration": duration,
+                }
+            )
+        except KeyError:
+            # This interval has not ended, just skip it
+            pass
     return result
 
 
