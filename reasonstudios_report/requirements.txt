@@ -1,0 +1,7 @@
+pandas
+reportlab
+pytest
+pytest-watch
+timew-report
+click
+python-dateutil

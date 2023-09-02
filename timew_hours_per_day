@@ -1,0 +1,27 @@
+#!/usr/bin/python3
+
+import os
+import datetime as dt
+import json
+import subprocess
+import sys
+
+from dateutil import parser
+from dateutil import tz
+
+
+def test():
+    print("hello")
+
+
+## operate in three months.
+## current month
+
+## previous month
+
+## start date - end date
+##
+## output csv with hours count / day
+## and hours sum in last row
+
+cmd = "timew export §reasonstudios"
