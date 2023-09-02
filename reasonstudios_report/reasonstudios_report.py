@@ -2,6 +2,7 @@ import click
 import io
 import subprocess
 
+from terminaltables import AsciiTable
 import pandas as pd
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
@@ -124,6 +125,9 @@ def main(year: int, month: int):
 
     rows.append(("total", total_duration))
     rows.insert(0, ("date", "hours"))
+
+    table = AsciiTable(rows)
+    print(table.table)
 
     make_pdf_table(rows, output)
     print(f"PDF report in {output}")

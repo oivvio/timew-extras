@@ -5,3 +5,4 @@ pytest-watch
 timew-report
 click
 python-dateutil
+terminaltables
