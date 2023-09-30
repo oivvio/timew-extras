@@ -121,7 +121,7 @@ def main(year: int, month: int):
     day = dt.date(year, month, 1)
 
     rows = get_date_and_hours_rows(intervals, day)
-    total_duration = sum([duration for (_, duration) in rows])
+    total_duration = round(sum([duration for (_, duration) in rows]),2)
 
     rows.append(("total", total_duration))
     rows.insert(0, ("date", "hours"))
